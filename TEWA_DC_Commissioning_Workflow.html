@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TEWA - DC Commissioning Workflow</title>
+<style>
+  :root {
+    --tewa-dark: #1a2332;
+    --tewa-blue: #2563eb;
+    --tewa-green: #16a34a;
+    --tewa-orange: #ea580c;
+    --tewa-red: #dc2626;
+    --tewa-yellow: #d97706;
+    --tewa-gray: #64748b;
+    --tewa-light: #f1f5f9;
+    --tewa-white: #ffffff;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--tewa-light); color: #1e293b; font-size: 14px; line-height: 1.5; }
+
+  .header { background: var(--tewa-dark); color: white; padding: 16px 20px; position: sticky; top: 0; z-index: 100; }
+  .header h1 { font-size: 18px; font-weight: 700; }
+  .header .subtitle { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+
+  .progress-bar { background: #334155; height: 6px; border-radius: 3px; margin-top: 10px; overflow: hidden; }
+  .progress-fill { background: var(--tewa-green); height: 100%; width: 0%; transition: width 0.3s; border-radius: 3px; }
+  .progress-text { font-size: 11px; color: #94a3b8; margin-top: 4px; text-align: right; }
+
+  .controls { padding: 10px 20px; background: white; border-bottom: 1px solid var(--border); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .controls button { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: white; cursor: pointer; font-size: 12px; font-weight: 500; }
+  .controls button:hover { background: var(--tewa-light); }
+  .controls button.active { background: var(--tewa-blue); color: white; border-color: var(--tewa-blue); }
+  .controls .reset { background: var(--tewa-red); color: white; border-color: var(--tewa-red); margin-left: auto; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+
+  .step { background: white; border-radius: 10px; margin-bottom: 12px; overflow: hidden; border: 1px solid var(--border); }
+  .step.milestone { border-left: 4px solid var(--tewa-orange); }
+  .step.completed-step { opacity: 0.7; }
+  .step.completed-step .step-header { background: #f0fdf4; }
+
+  .step-header { padding: 12px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px; user-select: none; }
+  .step-header:hover { background: var(--tewa-light); }
+
+  .step-number { min-width: 28px; height: 28px; border-radius: 50%; background: var(--tewa-blue); color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .step.milestone .step-number { background: var(--tewa-orange); }
+  .step.completed-step .step-number { background: var(--tewa-green); }
+
+  .step-title { font-weight: 600; font-size: 15px; flex: 1; }
+  .step-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; text-transform: uppercase; white-space: nowrap; }
+  .badge-no-energy { background: #dbeafe; color: #1d4ed8; }
+  .badge-live { background: #fef2f2; color: #dc2626; }
+  .badge-ptw { background: #fff7ed; color: #c2410c; }
+  .badge-itc { background: #f1f5f9; color: #475569; font-size: 9px; }
+
+  .chevron { transition: transform 0.2s; color: var(--tewa-gray); font-size: 18px; }
+  .step.open .chevron { transform: rotate(90deg); }
+
+  .step-body { display: none; padding: 0 16px 16px; }
+  .step.open .step-body { display: block; }
+
+  .check-group { margin-bottom: 12px; }
+  .check-group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--tewa-gray); margin-bottom: 6px; letter-spacing: 0.5px; }
+
+  .check-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+  .check-item:last-child { border-bottom: none; }
+  .check-item input[type="checkbox"] { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--tewa-green); flex-shrink: 0; cursor: pointer; }
+  .check-item label { cursor: pointer; flex: 1; }
+  .check-item .pass-criteria { background: #ecfdf5; border: 1px solid #bbf7d0; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; color: #166534; white-space: nowrap; margin-left: 4px; }
+  .check-item .warning { background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; color: #991b1b; white-space: nowrap; margin-left: 4px; }
+
+  .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px 12px; margin: 8px 0; font-size: 12px; color: #1e40af; }
+  .info-box.safety { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+  .info-box.equipment { background: #fefce8; border-color: #fde68a; color: #854d0e; }
+  .info-box strong { font-weight: 700; }
+
+  .test-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+  .test-table th { background: var(--tewa-dark); color: white; padding: 6px 10px; text-align: left; font-size: 11px; }
+  .test-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  .test-table tr:nth-child(even) td { background: #f8fafc; }
+
+  .step-footer { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .step-count { font-size: 11px; color: var(--tewa-gray); }
+
+  .separator { text-align: center; padding: 8px; color: var(--tewa-gray); font-size: 20px; }
+
+  /* WORKFLOW DIAGRAM */
+  .wf-section { background: white; border-bottom: 1px solid var(--border); padding: 20px; }
+  .wf-title { font-size: 14px; font-weight: 700; color: var(--tewa-dark); margin-bottom: 16px; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
+  .wf-diagram { display: flex; flex-direction: column; gap: 0; max-width: 860px; margin: 0 auto; position: relative; }
+
+  .wf-zone-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; padding: 6px 14px; border-radius: 4px; text-align: center; margin: 4px 0; }
+  .wf-zone-cold { background: #dbeafe; color: #1d4ed8; }
+  .wf-zone-live { background: #fef2f2; color: #dc2626; }
+
+  .wf-row { display: flex; align-items: stretch; gap: 0; }
+  .wf-box { flex: 1; border: 2px solid; border-radius: 8px; padding: 10px 12px; position: relative; min-width: 0; }
+  .wf-box.cold { border-color: #2563eb; background: #eff6ff; }
+  .wf-box.ptw { border-color: #ea580c; background: #fff7ed; }
+  .wf-box.live { border-color: #dc2626; background: #fef2f2; }
+
+  .wf-box-num { position: absolute; top: -10px; left: 12px; background: #2563eb; color: white; font-size: 11px; font-weight: 800; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .wf-box.ptw .wf-box-num { background: #ea580c; }
+  .wf-box.live .wf-box-num { background: #dc2626; }
+
+  .wf-box-title { font-size: 12px; font-weight: 700; margin-bottom: 4px; color: var(--tewa-dark); line-height: 1.2; }
+  .wf-box-tests { list-style: none; padding: 0; margin: 0; }
+  .wf-box-tests li { font-size: 10px; color: #475569; padding: 1px 0; line-height: 1.3; }
+  .wf-box-tests li::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .wf-box.cold .wf-box-tests li::before { background: #2563eb; }
+  .wf-box.ptw .wf-box-tests li::before { background: #ea580c; }
+  .wf-box.live .wf-box-tests li::before { background: #dc2626; }
+  .wf-pass { font-weight: 700; color: #166534; background: #dcfce7; padding: 0 3px; border-radius: 2px; font-size: 9px; }
+
+  .wf-arrow { display: flex; justify-content: center; align-items: center; padding: 4px 0; color: #94a3b8; font-size: 18px; }
+  .wf-arrow-h { display: flex; align-items: center; justify-content: center; width: 30px; flex-shrink: 0; color: #94a3b8; font-size: 18px; }
+
+  .wf-grid { display: grid; grid-template-columns: 1fr 30px 1fr 30px 1fr; gap: 0; align-items: stretch; }
+  .wf-grid-2 { display: grid; grid-template-columns: 1fr 30px 1fr; gap: 0; align-items: stretch; }
+
+  @media print {
+    .header { position: static; }
+    .controls { display: none; }
+    .wf-section { break-inside: avoid; page-break-inside: avoid; }
+    .step { break-inside: avoid; page-break-inside: avoid; }
+    .step-body { display: block !important; }
+    .check-item input[type="checkbox"] { -webkit-appearance: none; appearance: none; border: 1.5px solid #333; border-radius: 2px; }
+    body { font-size: 11px; }
+  }
+
+  @media (max-width: 700px) {
+    .wf-grid, .wf-grid-2 { grid-template-columns: 1fr; gap: 0; }
+    .wf-arrow-h { transform: rotate(90deg); width: auto; height: 24px; }
+    .wf-box { margin-bottom: 0; }
+  }
+
+  @media (max-width: 600px) {
+    .container { padding: 8px; }
+    .step-header { padding: 10px 12px; }
+    .step-body { padding: 0 12px 12px; }
+    .step-title { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>TEWA DC Commissioning Workflow</h1>
+  <div class="subtitle">PV Field - String Inverter Solution | Pragmatic Field Guide</div>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="progress-text" id="progressText">0 / 0 checks completed</div>
+</div>
+
+<div class="controls">
+  <button onclick="expandAll()">Expand All</button>
+  <button onclick="collapseAll()">Collapse All</button>
+  <button onclick="window.print()">Print</button>
+  <button class="reset" onclick="resetAll()">Reset All</button>
+</div>
+
+<!-- VISUAL WORKFLOW DIAGRAM -->
+<div class="wf-section">
+  <div class="wf-title">DC Commissioning Workflow Overview</div>
+  <div class="wf-diagram">
+
+    <div class="wf-zone-label wf-zone-cold">NO ENERGY ZONE</div>
+
+    <!-- Row 1: Steps 1-2-3 -->
+    <div class="wf-grid">
+      <div class="wf-box cold">
+        <div class="wf-box-num">1</div>
+        <div class="wf-box-title">Mechanical Completion</div>
+        <ul class="wf-box-tests">
+          <li>QA validation</li>
+          <li>All works 100% complete</li>
+          <li>Cables NOT connected</li>
+        </ul>
+      </div>
+      <div class="wf-arrow-h">&#10132;</div>
+      <div class="wf-box cold">
+        <div class="wf-box-num">2</div>
+        <div class="wf-box-title">PV Structure &amp; Modules</div>
+        <ul class="wf-box-tests">
+          <li>Visual inspection (damage, tilt, labels)</li>
+          <li>Bonding &amp; grounding</li>
+          <li>Torque check: 2% sample <span class="wf-pass">&le;5% fail</span></li>
+        </ul>
+      </div>
+      <div class="wf-arrow-h">&#10132;</div>
+      <div class="wf-box cold">
+        <div class="wf-box-num">3</div>
+        <div class="wf-box-title">Solar Cable Cold Com</div>
+        <ul class="wf-box-tests">
+          <li>Continuity test + labels check</li>
+          <li>IR: 1.5kV, 1 min <span class="wf-pass">R &gt; 100 M&Omega;</span></li>
+          <li>Leave DISCONNECTED both sides</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="wf-arrow">&#11015;</div>
+
+    <!-- Row 2: PTW -->
+    <div class="wf-grid-2" style="max-width:500px; margin:0 auto;">
+      <div class="wf-box ptw" style="grid-column: 1 / -1;">
+        <div class="wf-box-num">4</div>
+        <div class="wf-box-title">&#9888; MILESTONE: PTW &mdash; Solar Cable Energisation</div>
+        <ul class="wf-box-tests">
+          <li>Cold com reports submitted &amp; validated (48h before)</li>
+          <li>4 signatures: Head of Work + HSE + Site Manager + Com Manager</li>
+          <li>RAMS issued, technicians briefed, area secured</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="wf-arrow">&#11015;</div>
+    <div class="wf-zone-label wf-zone-live">&#9889; LIVE ZONE &mdash; LOTO REQUIRED FROM HERE</div>
+
+    <!-- Row 3: Steps 5-6 -->
+    <div class="wf-grid-2">
+      <div class="wf-box live">
+        <div class="wf-box-num">5</div>
+        <div class="wf-box-title">Solar Cable Energisation</div>
+        <ul class="wf-box-tests">
+          <li>2 techs + walkie-talkies + 1.5kV gloves</li>
+          <li>Verify 0V at inverter &#10132; connect &#10132; verify Voc</li>
+          <li>Check Voc + polarity between + and &minus;</li>
+        </ul>
+      </div>
+      <div class="wf-arrow-h">&#10132;</div>
+      <div class="wf-box live">
+        <div class="wf-box-num">6</div>
+        <div class="wf-box-title">PV String Cold Com</div>
+        <ul class="wf-box-tests">
+          <li>Riso: 1kV, 10s <span class="wf-pass">&gt; 1 M&Omega;</span></li>
+          <li>Voc: <span class="wf-pass">&lt; 3% dev</span> &nbsp; Isc: <span class="wf-pass">&lt; 10% dev</span></li>
+          <li>Irradiance &gt; 400 W/m&sup2; required</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="wf-arrow">&#11015;</div>
+
+    <!-- Row 4: Steps 7-8-9 -->
+    <div class="wf-grid">
+      <div class="wf-box cold">
+        <div class="wf-box-num">7</div>
+        <div class="wf-box-title">Inverter Inspection</div>
+        <ul class="wf-box-tests">
+          <li>Nameplate, labels, safety signs</li>
+          <li>DC/AC/GND connections check</li>
+          <li>DC inputs NOT connected to PV</li>
+        </ul>
+      </div>
+      <div class="wf-arrow-h">&#10132;</div>
+      <div class="wf-box ptw">
+        <div class="wf-box-num">8</div>
+        <div class="wf-box-title">&#9888; PTW: String &rarr; Inverter</div>
+        <ul class="wf-box-tests">
+          <li>Written approval from Employer</li>
+          <li>Connect per allocation</li>
+          <li>Verify polarity + torque mark</li>
+        </ul>
+      </div>
+      <div class="wf-arrow-h">&#10132;</div>
+      <div class="wf-box cold">
+        <div class="wf-box-num">9</div>
+        <div class="wf-box-title">LV Cable Cold Com</div>
+        <ul class="wf-box-tests">
+          <li>Continuity + labels</li>
+          <li>IR: 1kV, 1 min <span class="wf-pass">R &gt; 100 M&Omega;</span></li>
+          <li>Connections torque marked</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="container" id="workflow">
+
+<!-- STEP 1 -->
+<div class="step" data-step="1">
+  <div class="step-header" onclick="toggleStep(this)">
+    <div class="step-number">1</div>
+    <div class="step-title">Mechanical Completion</div>
+    <span class="step-badge badge-no-energy">No Energy</span>
+    <span class="step-count"></span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="step-body">
+    <div class="info-box">Validated by QA / Site Manager before any commissioning activity starts.</div>
+    <div class="check-group">
+      <div class="check-group-title">Prerequisites</div>
+      <div class="check-item"><input type="checkbox"><label>PV structure mechanical assembly 100% complete</label></div>
+      <div class="check-item"><input type="checkbox"><label>PV modules installed and connected on all strings</label></div>
+      <div class="check-item"><input type="checkbox"><label>Solar cables installed with terminations/connectors at both ends</label></div>
+      <div class="check-item"><input type="checkbox"><label>Solar cables NOT connected to PV modules side</label></div>
+      <div class="check-item"><input type="checkbox"><label>Solar cables NOT connected to inverter DC inputs</label></div>
+      <div class="check-item"><input type="checkbox"><label>Earthing system installed and tested (separate ITC)</label></div>
+      <div class="check-item"><input type="checkbox"><label>No ongoing works on the PV field area</label></div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2 -->
+<div class="step" data-step="2">
+  <div class="step-header" onclick="toggleStep(this)">
+    <div class="step-number">2</div>
+    <div class="step-title">PV Structure & Modules Cold Com</div>
+    <span class="step-badge badge-no-energy">No Energy</span>
+    <span class="step-badge badge-itc">ITC-1302</span>
+    <span class="step-count"></span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="step-body">
+    <div class="info-box equipment"><strong>Equipment:</strong> Measuring tape, spirit level, calibrated torque wrench, standard tools</div>
+
+    <div class="check-group">
+      <div class="check-group-title">Structure Checks</div>
+      <div class="check-item"><input type="checkbox"><label>All parts present and within tolerances per installation manual</label></div>
+      <div class="check-item"><input type="checkbox"><label>Clamps correctly installed, aligned and tightened</label></div>
+      <div class="check-item"><input type="checkbox"><label>Structure bonding & grounding as per design</label></div>
+      <div class="check-item"><input type="checkbox"><label>No damage: cuts, bends, scratches, rust</label></div>
+      <div class="check-item"><input type="checkbox"><label>Surrounding area clean, leveled, no debris/tools left</label></div>
+      <div class="check-item"><input type="checkbox"><label>Tilt & azimuth measured with spirit level - complies with design</label></div>
+      <div class="check-item"><input type="checkbox"><label>Row/table identification labels in place and visible</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Module Checks</div>
+      <div class="check-item"><input type="checkbox"><label>Brand, model and power match project design</label></div>
+      <div class="check-item"><input type="checkbox"><label>Visual inspection: glass not broken, frame not bent, backsheet intact</label></div>
+      <div class="check-item"><input type="checkbox"><label>Junction box glued/sealed, cables and connectors in good condition</label></div>
+      <div class="check-item"><input type="checkbox"><label>Module labels in place, readable</label></div>
+      <div class="check-item"><input type="checkbox"><label>Modules assembled per installation manual, clearances respected</label></div>
+      <div class="check-item"><input type="checkbox"><label>Module bonding & grounding per design</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Electrical Connections</div>
+      <div class="check-item"><input type="checkbox"><label>Correct number of modules per string as per design</label></div>
+      <div class="check-item"><input type="checkbox"><label>Connectors properly connected, tight and locked</label></div>
+      <div class="check-item"><input type="checkbox"><label>Cable management: protected from sharp edges, bending radius OK, no stress</label></div>
+      <div class="check-item"><input type="checkbox"><label>All connectors protected against weather</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Torque Verification</div>
+      <div class="check-item"><input type="checkbox"><label>All bolts/nuts torque marked (visible at 2m, outdoor ink)</label></div>
+      <div class="check-item"><input type="checkbox"><label>Torque check with calibrated wrench: min 2% sample<span class="pass-criteria">If &gt;5% fail → check entire row</span></label></div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 3 -->
+<div class="step" data-step="3">
+  <div class="step-header" onclick="toggleStep(this)">
+    <div class="step-number">3</div>
+    <div class="step-title">Solar Cable Cold Com</div>
+    <span class="step-badge badge-no-energy">No Energy</span>
+    <span class="step-badge badge-itc">ITC-1303</span>
+    <span class="step-count"></span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="step-body">
+    <div class="info-box safety"><strong>SAFETY:</strong> Cables treated as LIVE until proved DEAD. Areas at cable ends signalized and secured.</div>
+    <div class="info-box equipment"><strong>Equipment:</strong> Measuring tape, multimeter with continuity tester, megohmmeter (DC, 1.5kV range)</div>
+
+    <div class="check-group">
+      <div class="check-group-title">Visual Inspection</div>
+      <div class="check-item"><input type="checkbox"><label>Cable specs comply with design (correct section, Red = +, Black = -)</label></div>
+      <div class="check-item"><input type="checkbox"><label>Routing as per design, min bend radius respected</label></div>
+      <div class="check-item"><input type="checkbox"><label>No mechanical stress on terminations, protected from sharp edges</label></div>
+      <div class="check-item"><input type="checkbox"><label>UV protection fitted (if applicable)</label></div>
+      <div class="check-item"><input type="checkbox"><label>Termination at both ends per spec and best practices</label></div>
+      <div class="check-item"><input type="checkbox"><label>Labels at both ends: string ID + polarity</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Continuity Test</div>
+      <div class="check-item"><input type="checkbox"><label>Shunt one end (cable core to ground), verify continuity at other end</label></div>
+      <div class="check-item"><input type="checkbox"><label>Confirm continuous with shunt connected + intermittent with intermittent shunt</label></div>
+      <div class="check-item"><input type="checkbox"><label>Verify cable label identification and polarity are correct</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Insulation Resistance Test (IR)</div>
+      <table class="test-table">
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>Test Voltage</td><td><strong>1.5 kV DC</strong></td></tr>
+        <tr><td>Duration</td><td><strong>1 minute</strong></td></tr>
+        <tr><td>Location</td><td>Inverter or JB side</td></tr>
+        <tr><td>Standard</td><td>ANSI/NETA ATS-2009 table 100.1</td></tr>
+      </table>
+      <div class="check-item"><input type="checkbox"><label>Connect solar cables in parallel (respecting polarity)</label></div>
+      <div class="check-item"><input type="checkbox"><label>IR: Negative to Positive<span class="pass-criteria">PASS: R &gt; 100 MΩ</span></label></div>
+      <div class="check-item"><input type="checkbox"><label>IR: Negative to Ground<span class="pass-criteria">PASS: R &gt; 100 MΩ</span></label></div>
+      <div class="check-item"><input type="checkbox"><label>IR: Positive to Ground<span class="pass-criteria">PASS: R &gt; 100 MΩ</span></label></div>
+      <div class="check-item"><input type="checkbox"><label>If &lt; 100 MΩ → investigate cables individually</label></div>
+    </div>
+
+    <div class="info-box safety"><strong>POST-TEST:</strong> Connectors on BOTH ends (PV side and inverter side) MUST be left DISCONNECTED</div>
+  </div>
+</div>
+
+<!-- MILESTONE PTW -->
+<div class="step milestone" data-step="4">
+  <div class="step-header" onclick="toggleStep(this)">
+    <div class="step-number">&#9888;</div>
+    <div class="step-title">MILESTONE: PTW - Solar Cable Energisation</div>
+    <span class="step-badge badge-ptw">PTW Required</span>
+    <span class="step-badge badge-itc">ITC-1502</span>
+    <span class="step-count"></span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="step-body">
+    <div class="info-box safety"><strong>STOP:</strong> No energisation without signed PTW. Request at least 48h in advance.</div>
+
+    <div class="check-group">
+      <div class="check-group-title">PTW Prerequisites (all must be signed)</div>
+      <div class="check-item"><input type="checkbox"><label><strong>Head of Work:</strong> Safety/equipment/docs requirements met per Energisation Procedure</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Head of Work:</strong> Technicians know activities, procedure and RAMS</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Head of Work:</strong> Solar cable installation + termination completed and successfully tested</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>HSE Technician:</strong> RAMS issued, validated and presented to technicians</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>HSE Technician:</strong> Technicians have required qualifications/certifications</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>HSE Technician:</strong> Additional risks included in project HSE plan</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Site Manager:</strong> All works completed on PV field (mechanical + electrical)</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Site Manager:</strong> No works after testing that could affect results</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Site Manager:</strong> Measures to control further work + no unauthorized workers</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Com Manager:</strong> Testing reports validated</label></div>
+      <div class="check-item"><input type="checkbox"><label>All cold com reports submitted to Voltalia Com Manager</label></div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 5 -->
+<div class="step" data-step="5">
+  <div class="step-header" onclick="toggleStep(this)">
+    <div class="step-number">5</div>
+    <div class="step-title">Solar Cable Energisation</div>
+    <span class="step-badge badge-live">LIVE</span>
+    <span class="step-badge badge-itc">Protocol 1208</span>
+    <span class="step-count"></span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="step-body">
+    <div class="info-box safety"><strong>SAFETY:</strong> Min 2 qualified techs with walkie-talkies. PPE: flame-resistant clothing + 1.5kV gloves + helmet with visor. NO works on PV array during procedure. FORBIDDEN if raining or wet cables.</div>
+    <div class="info-box equipment"><strong>Equipment:</strong> Voltmeter (1.5kV DC), DC clamp meter, walkie-talkies, LOTO kit, warning signs, plastic barriers</div>
+
+    <div class="check-group">
+      <div class="check-group-title">Preparation</div>
+      <div class="check-item"><input type="checkbox"><label>Working area delimited around inverter (plastic chains + warning signs)</label></div>
+      <div class="check-item"><input type="checkbox"><label>Visual check: all solar cable terminations and labelling correct</label></div>
+      <div class="check-item"><input type="checkbox"><label>Connectors: correct specs, type (male/female) matches polarity, clean</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">For Each Solar Cable (repeat per cable)</div>
+      <div class="check-item"><input type="checkbox"><label><strong>Tech @ PV side:</strong> Check cable label, confirm ID and polarity</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Tech @ PV side:</strong> Verify connectors specs, polarity, clean, ready for connection</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Tech @ PV side:</strong> Contact inverter-side tech → inform cable ID + ready</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Tech @ Inverter:</strong> Identify cable, measure voltage to earth → confirm 0V<span class="pass-criteria">Must be 0V</span></label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Tech @ Inverter:</strong> Give permission to energise</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Tech @ PV side:</strong> Connect cable to PV module, verify correct connection</label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Tech @ Inverter:</strong> Measure voltage to earth → check:<span class="pass-criteria">Voltage present + decreasing + correct polarity</span></label></div>
+      <div class="check-item"><input type="checkbox"><label><strong>Both polarities done:</strong> Measure Voc between + and - → confirm range + polarity<span class="pass-criteria">Voc within expected range</span></label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Final Actions (after all cables energised or when leaving area)</div>
+      <div class="check-item"><input type="checkbox"><label>Organize cables: no short-circuit risk, no contact with structure/persons</label></div>
+      <div class="check-item"><input type="checkbox"><label>Cables fixed above ground, protected against water/rain</label></div>
+      <div class="check-item"><input type="checkbox"><label>Warning signs installed on each cable group</label></div>
+      <div class="check-item"><input type="checkbox"><label>Report energised cables and anomalies</label></div>
+    </div>
+
+    <div class="info-box safety"><strong>FROM THIS POINT:</strong> LOTO required for any access to downstream equipment. Cables are now LIVE.</div>
+  </div>
+</div>
+
+<!-- STEP 6 -->
+<div class="step" data-step="6">
+  <div class="step-header" onclick="toggleStep(this)">
+    <div class="step-number">6</div>
+    <div class="step-title">PV String Cold Com</div>
+    <span class="step-badge badge-live">LIVE</span>
+    <span class="step-badge badge-itc">ITC-1304</span>
+    <span class="step-count"></span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="step-body">
+    <div class="info-box safety"><strong>SAFETY:</strong> Strings in OPEN CIRCUIT throughout: fuse holders open, fuses removed, NOT connected to inverter DC inputs.</div>
+    <div class="info-box equipment"><strong>Equipment:</strong> Multimeter, Riso PV tester, PV string checker (Isc), irradiance sensor</div>
+
+    <div class="check-group">
+      <div class="check-group-title">Visual Checks</div>
+      <div class="check-item"><input type="checkbox"><label>PV string labels on both polarities per design</label></div>
+      <div class="check-item"><input type="checkbox"><label>Solar connectors: same type/manufacturer as modules, correctly installed (IEC 62548)</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Insulation Resistance (Riso) - IEC 62446-1 §6.7</div>
+      <table class="test-table">
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>Test Voltage</td><td><strong>1 kV</strong> (system &gt; 0.5kV) or <strong>1.5 kV</strong> (system &gt; 1kV)</td></tr>
+        <tr><td>Duration</td><td><strong>10 seconds</strong> each measurement</td></tr>
+        <tr><td>Location</td><td>At JB or inverter side</td></tr>
+      </table>
+      <div class="check-item"><input type="checkbox"><label>Riso: String Negative to Earth<span class="pass-criteria">PASS: Riso &gt; 1 MΩ</span></label></div>
+      <div class="check-item"><input type="checkbox"><label>Riso: String Positive to Earth<span class="pass-criteria">PASS: Riso &gt; 1 MΩ</span></label></div>
+      <div class="check-item"><input type="checkbox"><label>Register any string with discrepancy behaviour during measurement</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Polarity Check</div>
+      <div class="check-item"><input type="checkbox"><label>Verify polarity with voltmeter/PV checker → matches label + connector type (M/F)<span class="pass-criteria">Polarity OK</span></label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Open Circuit Voltage (Voc) - IEC 62446-1 §6.4</div>
+      <div class="check-item"><input type="checkbox"><label>Irradiance stable and &gt; 400 W/m² at module plane<span class="warning">Required condition</span></label></div>
+      <div class="check-item"><input type="checkbox"><label>Measure Voc of each string at shortest time possible</label></div>
+      <div class="check-item"><input type="checkbox"><label>Compare strings within same array<span class="pass-criteria">PASS: &lt; 3% deviation from array avg</span></label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Short Circuit Current (Isc) - IEC 62446-1 §6.5.2</div>
+      <div class="check-item"><input type="checkbox"><label>Irradiance stable and &gt; 400 W/m² at module plane<span class="warning">Required condition</span></label></div>
+      <div class="check-item"><input type="checkbox"><label>Measure Isc of each string with PV string checker</label></div>
+      <div class="check-item"><input type="checkbox"><label>Compare strings within same array<span class="pass-criteria">PASS: &lt; 10% deviation from array avg</span></label></div>
+    </div>
+
+    <div class="info-box"><strong>Record all measurements</strong> (Polarity, Voc, Riso, Isc) in the Excel file provided by the Employer.</div>
+  </div>
+</div>
+
+<!-- STEP 7 - INVERTER -->
+<div class="step" data-step="7">
+  <div class="step-header" onclick="toggleStep(this)">
+    <div class="step-number">7</div>
+    <div class="step-title">Inverter Installation Inspection</div>
+    <span class="step-badge badge-no-energy">No Energy</span>
+    <span class="step-badge badge-itc">ITC-1308</span>
+    <span class="step-count"></span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="step-body">
+    <div class="info-box safety"><strong>SAFETY:</strong> Parts treated as LIVE until proved DEAD. DC inputs NOT connected to PV field.</div>
+    <div class="info-box equipment"><strong>Equipment:</strong> Multimeter with continuity tester, torque wrench, measuring tape</div>
+
+    <div class="check-group">
+      <div class="check-group-title">Identification & Status</div>
+      <div class="check-item"><input type="checkbox"><label>Nameplate matches project design (brand, model, specs)</label></div>
+      <div class="check-item"><input type="checkbox"><label>Inverter ID label in place, correctly assigned per layout</label></div>
+      <div class="check-item"><input type="checkbox"><label>Safety labels: electric shock warning, "Solar DC - Live during daylight", dual source warning</label></div>
+      <div class="check-item"><input type="checkbox"><label>Labels readable, in local language</label></div>
+      <div class="check-item"><input type="checkbox"><label>Correctly fixed to structure, level, clearances per manual (jiggle test)</label></div>
+      <div class="check-item"><input type="checkbox"><label>No cracks, holes or damage affecting operation/IP rating</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Cabinets</div>
+      <div class="check-item"><input type="checkbox"><label>Doors and locks in good condition and operational</label></div>
+      <div class="check-item"><input type="checkbox"><label>Interior clean and dry, no signs of water/dust ingress</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">DC Connections (NOT connected to PV strings)</div>
+      <div class="check-item"><input type="checkbox"><label>Cable specs per design, termination correct</label></div>
+      <div class="check-item"><input type="checkbox"><label>Input polarity vs connector type (male/female) correct</label></div>
+      <div class="check-item"><input type="checkbox"><label>Cable glands tight (water tightness)</label></div>
+      <div class="check-item"><input type="checkbox"><label>Labelling correct</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">AC Connections</div>
+      <div class="check-item"><input type="checkbox"><label>Cable specs per design, phase sequence respected</label></div>
+      <div class="check-item"><input type="checkbox"><label>Connection tightened and torque marked</label></div>
+      <div class="check-item"><input type="checkbox"><label>Cable glands tight, labelling correct</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Ground Connections</div>
+      <div class="check-item"><input type="checkbox"><label>Specs per design, torque marked</label></div>
+      <div class="check-item"><input type="checkbox"><label>Anti-galvanic paste applied on outdoor copper-to-enclosure connections</label></div>
+    </div>
+  </div>
+</div>
+
+<!-- MILESTONE PTW 2 -->
+<div class="step milestone" data-step="8">
+  <div class="step-header" onclick="toggleStep(this)">
+    <div class="step-number">&#9888;</div>
+    <div class="step-title">MILESTONE: PTW - PV String Connection to Inverter</div>
+    <span class="step-badge badge-ptw">PTW Required</span>
+    <span class="step-count"></span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="step-body">
+    <div class="info-box safety"><strong>STOP:</strong> Written approval from Employer (Voltalia) required before connecting strings to inverter.</div>
+    <div class="check-group">
+      <div class="check-group-title">Prerequisites</div>
+      <div class="check-item"><input type="checkbox"><label>All PV string cold com reports validated by Com Manager</label></div>
+      <div class="check-item"><input type="checkbox"><label>Inverter installation inspection validated</label></div>
+      <div class="check-item"><input type="checkbox"><label>Written approval received from Employer</label></div>
+      <div class="check-item"><input type="checkbox"><label>Connection allocation received from Employer (which string → which input)</label></div>
+      <div class="check-item"><input type="checkbox"><label>LOTO in place</label></div>
+    </div>
+    <div class="check-group">
+      <div class="check-group-title">Connection</div>
+      <div class="check-item"><input type="checkbox"><label>Connect PV strings to inverter DC inputs per allocation</label></div>
+      <div class="check-item"><input type="checkbox"><label>Verify correct polarity at each connection</label></div>
+      <div class="check-item"><input type="checkbox"><label>All connections tight, torque marked</label></div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 9 - LV CABLE -->
+<div class="step" data-step="9">
+  <div class="step-header" onclick="toggleStep(this)">
+    <div class="step-number">9</div>
+    <div class="step-title">LV Cable Cold Com (Inverter to TC)</div>
+    <span class="step-badge badge-no-energy">No Energy</span>
+    <span class="step-badge badge-itc">ITC-1305</span>
+    <span class="step-count"></span>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="step-body">
+    <div class="info-box safety"><strong>SAFETY:</strong> Cables treated as LIVE until proved DEAD. Areas at cable ends signalized and secured.</div>
+    <div class="info-box equipment"><strong>Equipment:</strong> Measuring tape, multimeter with continuity tester, torque wrench, megohmmeter (DC)</div>
+
+    <div class="check-group">
+      <div class="check-group-title">Visual Inspection</div>
+      <div class="check-item"><input type="checkbox"><label>Cable specs comply with design</label></div>
+      <div class="check-item"><input type="checkbox"><label>Routing per design, min bend radius, no stress, protected from edges, UV protection</label></div>
+      <div class="check-item"><input type="checkbox"><label>Termination at both ends per spec and best practices</label></div>
+      <div class="check-item"><input type="checkbox"><label>Labels at both ends: cable ID + phase/polarity</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Continuity & Identification Test</div>
+      <div class="check-item"><input type="checkbox"><label>Shunt one end, verify continuity at other end (continuous + intermittent)</label></div>
+      <div class="check-item"><input type="checkbox"><label>Verify cable label, phase and connections correct</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Insulation Resistance Test (IR)</div>
+      <table class="test-table">
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>Test Voltage</td><td><strong>1 kV DC</strong> (per cable nominal voltage)</td></tr>
+        <tr><td>Duration</td><td><strong>1 minute</strong></td></tr>
+        <tr><td>Standard</td><td>ANSI/NETA ATS-2009 table 100.1</td></tr>
+      </table>
+      <div class="check-item"><input type="checkbox"><label>Single core: test between core and ground/shield + between phases</label></div>
+      <div class="check-item"><input type="checkbox"><label>Multicore: test between cores + each core to ground/shield</label></div>
+      <div class="check-item"><input type="checkbox"><label>Results per manufacturer data or ANSI/NETA<span class="pass-criteria">PASS: IR &gt; 100 MΩ</span></label></div>
+      <div class="check-item"><input type="checkbox"><label>Compare results between similar/parallel cables</label></div>
+    </div>
+
+    <div class="check-group">
+      <div class="check-group-title">Cable Connection</div>
+      <div class="check-item"><input type="checkbox"><label>Connection correct per cable ID and phase/polarity</label></div>
+      <div class="check-item"><input type="checkbox"><label>Torque marked, no signs of loosening</label></div>
+      <div class="check-item"><input type="checkbox"><label>Terminals aligned, no mechanical stress</label></div>
+      <div class="check-item"><input type="checkbox"><label>If fitted: metallic oversheath connected to earth point</label></div>
+    </div>
+  </div>
+</div>
+
+<!-- IR SUMMARY -->
+<div class="step" data-step="summary">
+  <div class="step-header" onclick="toggleStep(this)">
+    <div class="step-number" style="background:#7c3aed">&#9889;</div>
+    <div class="step-title">Quick Reference: All IR/Test Pass Criteria</div>
+    <span class="chevron">&#9654;</span>
+  </div>
+  <div class="step-body">
+    <table class="test-table">
+      <tr><th>Test</th><th>Voltage</th><th>Duration</th><th>Pass Criteria</th><th>Standard</th></tr>
+      <tr><td><strong>Solar Cable IR</strong></td><td>1.5 kV DC</td><td>1 min</td><td style="color:#166534;font-weight:700">R &gt; 100 MΩ</td><td>ANSI/NETA ATS-2009</td></tr>
+      <tr><td><strong>PV String Riso</strong></td><td>1 kV / 1.5 kV DC</td><td>10 sec</td><td style="color:#166534;font-weight:700">Riso &gt; 1 MΩ</td><td>IEC 62446-1 §6.7</td></tr>
+      <tr><td><strong>PV String Voc</strong></td><td>-</td><td>-</td><td style="color:#166534;font-weight:700">&lt; 3% deviation</td><td>IEC 62446-1 §6.4</td></tr>
+      <tr><td><strong>PV String Isc</strong></td><td>-</td><td>-</td><td style="color:#166534;font-weight:700">&lt; 10% deviation</td><td>IEC 62446-1 §6.5.2</td></tr>
+      <tr><td><strong>LV Cable IR</strong></td><td>1 kV DC</td><td>1 min</td><td style="color:#166534;font-weight:700">R &gt; 100 MΩ</td><td>ANSI/NETA ATS-2009</td></tr>
+      <tr><td><strong>Operational Isc</strong></td><td>-</td><td>-</td><td style="color:#166534;font-weight:700">&lt; 5% deviation</td><td>IEC 62446-1 §6.5.3</td></tr>
+    </table>
+    <div class="info-box" style="margin-top:10px"><strong>Irradiance conditions:</strong> Voc & Isc require stable irradiance &gt; 400 W/m². Operational Isc requires &gt; 500 W/m².</div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function toggleStep(header) {
+  header.parentElement.classList.toggle('open');
+}
+
+function expandAll() {
+  document.querySelectorAll('.step').forEach(s => s.classList.add('open'));
+}
+
+function collapseAll() {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('open'));
+}
+
+function resetAll() {
+  if (confirm('Reset all checkboxes?')) {
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('completed-step'));
+    updateProgress();
+    saveState();
+  }
+}
+
+function updateProgress() {
+  const all = document.querySelectorAll('input[type="checkbox"]');
+  const checked = document.querySelectorAll('input[type="checkbox"]:checked');
+  const pct = all.length ? Math.round((checked.length / all.length) * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = checked.length + ' / ' + all.length + ' checks completed (' + pct + '%)';
+
+  // Mark completed steps
+  document.querySelectorAll('.step').forEach(step => {
+    const stepChecks = step.querySelectorAll('input[type="checkbox"]');
+    const stepDone = step.querySelectorAll('input[type="checkbox"]:checked');
+    if (stepChecks.length > 0 && stepChecks.length === stepDone.length) {
+      step.classList.add('completed-step');
+    } else {
+      step.classList.remove('completed-step');
+    }
+    // Update count
+    const countEl = step.querySelector('.step-count');
+    if (countEl && stepChecks.length > 0) {
+      countEl.textContent = stepDone.length + '/' + stepChecks.length;
+    }
+  });
+}
+
+function saveState() {
+  const state = [];
+  document.querySelectorAll('input[type="checkbox"]').forEach((cb, i) => {
+    state.push(cb.checked ? 1 : 0);
+  });
+  try { localStorage.setItem('tewa_dc_workflow', JSON.stringify(state)); } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const state = JSON.parse(localStorage.getItem('tewa_dc_workflow'));
+    if (state) {
+      document.querySelectorAll('input[type="checkbox"]').forEach((cb, i) => {
+        if (state[i]) cb.checked = true;
+      });
+    }
+  } catch(e) {}
+  updateProgress();
+}
+
+document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+  cb.addEventListener('change', () => { updateProgress(); saveState(); });
+});
+
+loadState();
+</script>
+
+</body>
+</html>
